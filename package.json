@@ -1,0 +1,23 @@
+{
+  "name": "hono",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch server/index.ts",
+    "build": "tsc",
+    "start": "node dist/server/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.7",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "hono": "^4.11.1",
+    "openai": "^6.15.0",
+    "technicalindicators": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/axios": "^0.14.4",
+    "@types/node": "^25.0.3",
+    "tsx": "^4.7.1",
+    "typescript": "^5.8.3"
+  }
+}

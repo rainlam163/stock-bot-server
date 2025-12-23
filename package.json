@@ -9,7 +9,6 @@
   "dependencies": {
     "@hono/node-server": "^1.19.7",
     "axios": "^1.13.2",
-    "dotenv": "^17.2.3",
     "hono": "^4.11.1",
     "openai": "^6.15.0",
     "technicalindicators": "^3.1.0"

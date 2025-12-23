@@ -1,13 +1,10 @@
 import { OpenAI } from 'openai';
 import TI from 'technicalindicators';
-import { config } from 'dotenv'
 
 const GlmModel = 'glm-4-flash';
 
-config(); // Load environment variables from .env file
-
 const client = new OpenAI({
-    apiKey: process.env.ZHIPU_API_KEY,
+    apiKey: 'e08d19b7535344a19b07a4c842ad03f7.kv4mN181BrQcHqDg',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/'
 });
 

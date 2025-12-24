@@ -19,7 +19,7 @@ async function fetchHistory(symbol, isIndex = false) {
         const response = await axios.get(url, {
             params: {
                 secid: secid,
-                fields1: 'f1,f2,f3,f4,f5,f6',
+                fields1: 'f1,f2,f3,f4,f5,f6,f7',
                 // f51:日期, f52:开, f53:收, f54:高, f55:低, f56:成交量, f61:换手率
                 fields2: 'f51,f52,f53,f54,f55,f56,f61',
                 klt: '101', // 日线
@@ -36,14 +36,15 @@ async function fetchHistory(symbol, isIndex = false) {
             code: data.code,
             name: data.name,
             klines: data.klines.map((line) => {
-                const [date, open, close, high, low, volume] = line.split(',');
+                const [date, open, close, high, low, volume, turnover] = line.split(',');
                 return {
-                    date,
-                    open: parseFloat(open),
-                    close: parseFloat(close),
-                    high: parseFloat(high),
-                    low: parseFloat(low),
-                    volume: parseInt(volume)
+                    date, // 日期
+                    open: parseFloat(open), // 开盘价
+                    close: parseFloat(close), // 收盘价
+                    high: parseFloat(high), // 最高价
+                    low: parseFloat(low), // 最低价
+                    volume: parseInt(volume), // 成交量
+                    turnover: parseFloat(turnover), // 换手率
                 };
             }),
         };

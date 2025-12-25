@@ -15,17 +15,14 @@ app.get('/', (c) => {
 // 批量分析接口
 app.post('/api/analyze', async (c) => {
   const body = await c.req.json();
-  const codes = body.codes;
+  const code = body.code;
+  const holdingInfo = body.holdingInfo; // { status, cost, quantity, profit }
 
-  if (!codes || !Array.isArray(codes) || codes.length === 0) {
-    return c.json({ error: '请提供有效的股票代码数组 (codes)' }, 400);
+  if (!code || typeof code !== 'string') {
+    return c.json({ error: '请提供有效的股票代码 (code)' }, 400);
   }
 
-  if (codes.length > 10) {
-    return c.json({ error: '一次请求最多支持分析 10 只股票' }, 400);
-  }
-
-  console.log(`收到 API 分析请求，股票列表: ${codes.join(', ')}`);
+  console.log(`收到 API 分析请求，股票: ${code}, 持仓状态: ${holdingInfo?.status || 'unknown'}`);
 
   // 1. 获取大盘基准
   const indexHistory = await getMarketContext();
@@ -52,25 +49,15 @@ app.post('/api/analyze', async (c) => {
   finalReport += `**报告生成时间:** ${now.toLocaleString()}\n\n`;
   finalReport += `**当前场景:** ${sceneNote}\n\n`;
 
-  // 2. 批量分析
-  const results = [];
-  const promises = codes.map(code => analyzeStock(code, indexHistory));
-  const analysisResults = await Promise.all(promises);
-  results.push(...analysisResults);
-
-  // 逐个分析（如果需要更细粒度的控制，可以使用下面的代码）
-  // for (const code of codes) {
-  //   const result = await analyzeStock(code, indexHistory);
-  //   results.push(result);
-  //   // 简单限流
-  //   await new Promise(r => setTimeout(r, 1000));
-  // }
+  // 2. 分析单只股票 (带持仓信息)
+  const result = await analyzeStock(code, indexHistory, holdingInfo);
+  const results = [result];
 
   return c.json({
     success: true,
     timestamp: new Date().toISOString(),
     benchmark_date: indexHistory[indexHistory.length - 1].date,
-    results,
+    results, // Keep array structure for frontend compatibility
     finalReport
   });
 });

@@ -1,6 +1,6 @@
 import { fetchHistory } from './crawler.js'
 import { fetchStockNews } from './news.js'
-import { getAIAdvice } from './ai.js'
+import { getAIAdvice, HoldingInfo } from './ai.js'
 
 /**
  * 获取大盘行情（通常是上证指数 000001）
@@ -15,9 +15,10 @@ async function getMarketContext() {
  * 分析单只股票
  * @param {string} code 股票代码
  * @param {Array} indexHistory 大盘K线（基准）
+ * @param {HoldingInfo} holdingInfo 持仓信息（可选）
  * @returns {Promise<Object>} 分析结果 { code, name, advice, error }
  */
-async function analyzeStock(code: string, indexHistory: Array<any>): Promise<object> {
+async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo): Promise<object> {
     try {
         // 并行抓取：K线数据 + 舆情新闻
         const [stockHistory, newsList] = await Promise.all([
@@ -46,7 +47,7 @@ async function analyzeStock(code: string, indexHistory: Array<any>): Promise<obj
         const formattedStockHistory = toOHLCV(stockHistory.klines);
         const formattedIndexHistory = toOHLCV(indexHistory || []);
 
-        const advice = await getAIAdvice(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList);
+        const advice = await getAIAdvice(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo);
         
         return { 
             code, 

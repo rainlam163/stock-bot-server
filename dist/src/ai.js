@@ -5,7 +5,7 @@ const client = new OpenAI({
     apiKey: 'e08d19b7535344a19b07a4c842ad03f7.kv4mN181BrQcHqDg',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/'
 });
-async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = []) {
+async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
     // 1. 准备基础数据（收盘价数组）
     const closes = stockHistory.map(d => d.close);
     const recent = stockHistory.slice(-20);
@@ -43,8 +43,27 @@ async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsLi
     const newsContext = newsList.length > 0
         ? newsList.map(n => `- [${n.date.slice(0, 10)}] ${n.title}`).join('\n')
         : "暂无近期重大舆情";
-    // 8. 构建深度量化 Prompt
+    // 8. 构建持仓上下文
+    let holdingContext = "用户当前状态: 【空仓观望】。请侧重分析入场机会与风险性价比。";
+    if (holdingInfo && holdingInfo.status === 'holding') {
+        const cost = holdingInfo.cost || 0;
+        const diffRate = cost > 0 ? ((lastPrice - cost) / cost * 100).toFixed(2) : 0;
+        holdingContext = `用户当前状态: 【持有底仓】。
+- 持仓成本: ${cost} 元
+- 当前价格: ${lastPrice} 元
+- 持仓数量: ${holdingInfo.quantity || 0} 股
+- 当前盈亏浮动: ${diffRate}% (${Number(diffRate) > 0 ? '盈利' : '亏损'})
+- 累计盈亏额: ${holdingInfo.profit || '未知'} 元
+
+请务必基于用户的**持仓成本**给出针对性建议：
+- 若深套，分析是该“割肉止损”还是“低位补仓做T”。
+- 若微利/微亏，分析是“继续持有”还是“落袋为安”。
+- 若大幅盈利，分析“止盈保护位”在哪里。`;
+    }
+    // 9. 构建深度量化 Prompt
     const prompt = `你是一名拥有15年经验的 A 股量化交易专家，擅长短线博弈与情绪周期分析。请对 ${stockName} (${symbol}) 进行深度分析。
+
+${holdingContext}
 
 【深度因子指标】:
 - 当前价: ${lastPrice} (MA5: ${ma5}, MA12: ${ma12}, MA20: ${ma20}, MA72: ${ma72})
@@ -64,16 +83,16 @@ ${indexRecent.map(d => d.close).join(', ')}
 
 【分析任务】:
 1. **量价与主力动能**: 结合成交量、量比和 MACD。分析是否存在“放量突破”、“缩量回调”或“高位滞涨”。识别当前是主力吸筹、洗盘还是派发阶段。
-2. **舆情与情绪面**: 结合【近期舆情与公告】，判断是否存在利好催化或利空风险（如业绩预告、减持、行业政策）。
-3. **形态与波动边界**: 观察布林线张口状态。判断当前价格是否触及压力/支撑位，并结合 A 股 T+1 制度，评估今日买入后的次日溢价可能性。
-4. **实战操作指令**: 给出明确的交易计划。
-   - **操作评级**: (看多/观望/减仓)
-   - **仓位建议**: (0-100%)
-   - **具体点位**: 建议买入点、目标卖出点、硬性止损位。
+2. **舆情与情绪面**: 结合【近期舆情与公告】，判断是否存在利好催化或利空风险。
+3. **形态与波动边界**: 观察布林线张口状态。判断当前价格是否触及压力/支撑位。
+4. **用户专属操作建议**: **这是最重要的部分**。基于用户的持仓状态（${holdingInfo?.status === 'holding' ? `成本 ${holdingInfo.cost}, 盈亏 ${holdingInfo.profit}` : '空仓'}），给出明确指令。
+   - **操作评级**: (看多/观望/减仓/清仓/补仓)
+   - **核心策略**: (例如：做T降本 / 止损离场 / 持股待涨 / 逢低吸纳)
+   - **具体点位**: 建议买入/补仓点、目标卖出/止盈点、硬性止损位。
 
 请以专业、简洁的 Markdown 格式输出。
 
-#### ${symbol} (${stockName}) 深度因子与舆情分析报告
+#### ${symbol} (${stockName}) 深度诊断报告
 
 #### 1. 量价与动能分析:
 ...
@@ -84,13 +103,13 @@ ${indexRecent.map(d => d.close).join(', ')}
 #### 3. 形态与综合研判:
 ...
 
-#### 4. 操盘手指令 (Trade Plan):
-- **策略**: ...
-- **入场**: ...
-- **止损**: ...
-- **仓位**: ...
+#### 4. 账户专属策略 (Action Plan):
+> **当前状态**: ${holdingInfo?.status === 'holding' ? `持有 (成本 ${holdingInfo.cost})` : '空仓'}
+- **核心指令**: ...
+- **关键点位**: ...
+- **操作理由**: ...
 
-请在回复时，段落之间务必保留一个完整的空行（即使用两次换行符），以确保 Markdown 渲染正常。
+请在回复时，段落之间务必保留一个完整的空行。
 `;
     try {
         const completion = await client.chat.completions.create({

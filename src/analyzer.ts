@@ -1,6 +1,6 @@
 import { fetchHistory } from './crawler.js'
 import { fetchStockNews } from './news.js'
-import { getAIAdvice, HoldingInfo } from './ai.js'
+import { getAIAdvice, getAIAdviceStream, HoldingInfo } from './ai.js'
 
 /**
  * 获取大盘行情（通常是上证指数 000001）
@@ -63,4 +63,51 @@ async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?
     }
 }
 
-export { getMarketContext, analyzeStock };
+async function* analyzeStockStream(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo): AsyncGenerator<string, void, unknown> {
+    try {
+        // 并行抓取：K线数据 + 舆情新闻
+        const [stockHistory, newsList] = await Promise.all([
+            fetchHistory(code),
+            fetchStockNews(code)
+        ]);
+
+        if (!stockHistory?.klines?.length) {
+            yield JSON.stringify({ type: 'error', data: '数据获取失败，请检查代码是否正确。' }) + "\n";
+            return;
+        }
+
+        const toOHLCV = (klines: any[] = []): any[] => klines.map(k => ({
+            date: k.date,
+            open: Number(k.open),
+            close: Number(k.close),
+            high: Number(k.high),
+            low: Number(k.low),
+            volume: Number(k.volume),
+            turnover: typeof k.turnover !== 'undefined' ? Number(k.turnover) : 0
+        }));
+
+        const formattedStockHistory = toOHLCV(stockHistory.klines);
+        const formattedIndexHistory = toOHLCV(indexHistory || []);
+
+        // Yield start event
+        yield JSON.stringify({ 
+            type: 'start', 
+            data: { 
+                code, 
+                name: stockHistory.name 
+            } 
+        }) + "\n";
+
+        // Stream AI advice
+        const stream = getAIAdviceStream(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo);
+        
+        for await (const chunk of stream) {
+            yield JSON.stringify({ type: 'chunk', data: chunk }) + "\n";
+        }
+
+    } catch (error: any) {
+         yield JSON.stringify({ type: 'error', data: `分析出错: ${error.message}` }) + "\n";
+    }
+}
+
+export { getMarketContext, analyzeStock, analyzeStockStream };

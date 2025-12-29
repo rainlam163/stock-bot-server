@@ -5,7 +5,7 @@ const client = new OpenAI({
     apiKey: 'e08d19b7535344a19b07a4c842ad03f7.kv4mN181BrQcHqDg',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/'
 });
-async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
+function buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
     // 1. 准备基础数据（收盘价数组）
     const closes = stockHistory.map(d => d.close);
     const recent = stockHistory.slice(-20);
@@ -61,7 +61,7 @@ async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsLi
 - 若大幅盈利，分析“止盈保护位”在哪里。`;
     }
     // 9. 构建深度量化 Prompt
-    const prompt = `你是一名拥有15年经验的 A 股量化交易专家，擅长短线博弈与情绪周期分析。请对 ${stockName} (${symbol}) 进行深度分析。
+    return `你是一名拥有15年经验的 A 股量化交易专家，擅长短线博弈与情绪周期分析。请对 ${stockName} (${symbol}) 进行深度分析。
 
 ${holdingContext}
 
@@ -111,6 +111,9 @@ ${indexRecent.map(d => d.close).join(', ')}
 
 请在回复时，段落之间务必保留一个完整的空行。
 `;
+}
+async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
+    const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
     try {
         const completion = await client.chat.completions.create({
             model: GlmModel,
@@ -123,4 +126,24 @@ ${indexRecent.map(d => d.close).join(', ')}
         return `AI 深度因子分析出错: ${err.message}`;
     }
 }
-export { getAIAdvice };
+async function* getAIAdviceStream(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
+    const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+    try {
+        const stream = await client.chat.completions.create({
+            model: GlmModel,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            stream: true,
+        });
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+                yield content;
+            }
+        }
+    }
+    catch (err) {
+        yield `AI 深度因子分析出错: ${err.message}`;
+    }
+}
+export { getAIAdvice, getAIAdviceStream };

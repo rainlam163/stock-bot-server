@@ -46,14 +46,14 @@ export interface HoldingInfo {
     profit?: number;
 }
 
-async function getAIAdvice(
+function buildAnalysisPrompt(
     symbol: string,
     stockName: string,
     stockHistory: OHLCV[],
     indexHistory: OHLCV[],
     newsList: NewsItem[] = [],
     holdingInfo?: HoldingInfo
-): Promise<string> {
+): string {
     // 1. 准备基础数据（收盘价数组）
     const closes: number[] = stockHistory.map(d => d.close);
     const recent: OHLCV[] = stockHistory.slice(-20);
@@ -117,7 +117,7 @@ async function getAIAdvice(
     }
 
     // 9. 构建深度量化 Prompt
-    const prompt: string = `你是一名拥有15年经验的 A 股量化交易专家，擅长短线博弈与情绪周期分析。请对 ${stockName} (${symbol}) 进行深度分析。
+    return `你是一名拥有15年经验的 A 股量化交易专家，擅长短线博弈与情绪周期分析。请对 ${stockName} (${symbol}) 进行深度分析。
 
 ${holdingContext}
 
@@ -148,8 +148,6 @@ ${indexRecent.map(d => d.close).join(', ')}
 
 请以专业、简洁的 Markdown 格式输出。
 
-#### ${symbol} (${stockName}) 深度诊断报告
-
 #### 1. 量价与动能分析:
 ...
 
@@ -160,13 +158,24 @@ ${indexRecent.map(d => d.close).join(', ')}
 ...
 
 #### 4. 账户专属策略 (Action Plan):
-> **当前状态**: ${holdingInfo?.status === 'holding' ? `持有 (成本 ${holdingInfo.cost})` : '空仓'}
+- **当前状态**: ${holdingInfo?.status === 'holding' ? `持有 (成本 ${holdingInfo.cost})` : '空仓'}
 - **核心指令**: ...
 - **关键点位**: ...
 - **操作理由**: ...
 
 请在回复时，段落之间务必保留一个完整的空行。
 `;
+}
+
+async function getAIAdvice(
+    symbol: string,
+    stockName: string,
+    stockHistory: OHLCV[],
+    indexHistory: OHLCV[],
+    newsList: NewsItem[] = [],
+    holdingInfo?: HoldingInfo
+): Promise<string> {
+    const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
 
     try {
         const completion: any = await client.chat.completions.create({
@@ -180,4 +189,33 @@ ${indexRecent.map(d => d.close).join(', ')}
     }
 }
 
-export { getAIAdvice };
+async function* getAIAdviceStream(
+    symbol: string,
+    stockName: string,
+    stockHistory: OHLCV[],
+    indexHistory: OHLCV[],
+    newsList: NewsItem[] = [],
+    holdingInfo?: HoldingInfo
+): AsyncGenerator<string, void, unknown> {
+    const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+
+    try {
+        const stream = await client.chat.completions.create({
+            model: GlmModel,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            stream: true,
+        });
+
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+                yield content;
+            }
+        }
+    } catch (err: any) {
+        yield `AI 深度因子分析出错: ${err.message}`;
+    }
+}
+
+export { getAIAdvice, getAIAdviceStream };

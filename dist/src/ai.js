@@ -92,8 +92,6 @@ ${indexRecent.map(d => d.close).join(', ')}
 
 请以专业、简洁的 Markdown 格式输出。
 
-#### ${symbol} (${stockName}) 深度诊断报告
-
 #### 1. 量价与动能分析:
 ...
 
@@ -104,7 +102,7 @@ ${indexRecent.map(d => d.close).join(', ')}
 ...
 
 #### 4. 账户专属策略 (Action Plan):
-> **当前状态**: ${holdingInfo?.status === 'holding' ? `持有 (成本 ${holdingInfo.cost})` : '空仓'}
+- **当前状态**: ${holdingInfo?.status === 'holding' ? `持有 (成本 ${holdingInfo.cost})` : '空仓'}
 - **核心指令**: ...
 - **关键点位**: ...
 - **操作理由**: ...

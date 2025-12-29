@@ -31,13 +31,13 @@ app.post('/api/analyze', async (c) => {
         // 判断当前运行场景
         let sceneNote = "";
         if (now.getHours() < 9) {
-            sceneNote = "【盘前预警】当前为开盘前，以下建议基于上一交易日收盘数据，适用于今日操作。 উত্ত";
+            sceneNote = "【盘前预警】当前为开盘前，以下建议基于上一交易日收盘数据，适用于今日操作。";
         }
         else if (now.getHours() >= 15) {
-            sceneNote = "【盘后复盘】今日交易已结束，以下建议适用于下一交易日。 উত্ত";
+            sceneNote = "【盘后复盘】今日交易已结束，以下建议适用于下一交易日。";
         }
         else {
-            sceneNote = "【盘中参考】当前市场正在交易，数据可能存在波动。 উত্ত";
+            sceneNote = "【盘中参考】当前市场正在交易，数据可能存在波动。";
         }
         let finalReport = `**数据基准日:** ${tradingDate}\n\n`;
         finalReport += `**报告生成时间:** ${now.toLocaleString()}\n\n`;

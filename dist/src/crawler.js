@@ -3,8 +3,9 @@ import axios from 'axios';
  * 抓取历史数据
  * @param {string} symbol 代码
  * @param {boolean} isIndex 是否为指数
+ * @param {number} recentMonths 获取最近几个月的数据 (0=全部)
  */
-async function fetchHistory(symbol, isIndex = false) {
+async function fetchHistory(symbol, isIndex = false, recentMonths = 3) {
     let prefix;
     // 指数或5/6开头为上海(1)，其余通常为深圳(0)
     if (isIndex || symbol.startsWith('5') || symbol.startsWith('6')) {
@@ -12,6 +13,16 @@ async function fetchHistory(symbol, isIndex = false) {
     }
     else {
         prefix = '0';
+    }
+    // 计算起始日期
+    let startDate = '0';
+    if (recentMonths > 0) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - recentMonths);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        startDate = `${y}${m}${day}`;
     }
     const secid = `${prefix}.${symbol}`;
     const url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get';
@@ -24,7 +35,7 @@ async function fetchHistory(symbol, isIndex = false) {
                 fields2: 'f51,f52,f53,f54,f55,f56,f61',
                 klt: '101', // 日线
                 fqt: '1', // 前复权
-                beg: '0',
+                beg: startDate,
                 end: '20500101',
             },
             headers: { 'Referer': 'https://quote.eastmoney.com/' }
@@ -54,4 +65,45 @@ async function fetchHistory(symbol, isIndex = false) {
         return null;
     }
 }
-export { fetchHistory };
+/**
+ * 获取热门/涨幅榜股票 (筛选A股主板)
+ * @param {number} limit 获取数量
+ */
+async function fetchHotStocks(limit = 20) {
+    const url = 'https://push2.eastmoney.com/api/qt/clist/get';
+    try {
+        const response = await axios.get(url, {
+            params: {
+                pn: '1', // 页码
+                pz: limit, // 每页数量
+                po: '1', // 排序方向：1倒序
+                np: '1',
+                ut: 'bd1d9ddb04089700cf9c27f6f7426281',
+                fltt: '2',
+                invt: '2',
+                wbp2u: '|0|0|0|web',
+                fid: 'f3', // 排序字段：f3涨跌幅
+                fs: 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23', // 筛选板块：沪深A股主板 (大概范围)
+                fields: 'f12,f14,f2,f3,f10,f8', // f12代码, f14名称, f2最新价, f3涨幅, f10量比, f8换手率
+                _: Date.now()
+            },
+            headers: { 'Referer': 'https://quote.eastmoney.com/' }
+        });
+        const list = response.data?.data?.diff;
+        if (!list)
+            return [];
+        return list.map((item) => ({
+            code: item.f12,
+            name: item.f14,
+            price: item.f2,
+            changePercent: item.f3,
+            volumeRatio: item.f10,
+            turnoverRate: item.f8
+        }));
+    }
+    catch (err) {
+        console.error('获取热门股票失败:', err.message);
+        return [];
+    }
+}
+export { fetchHistory, fetchHotStocks };

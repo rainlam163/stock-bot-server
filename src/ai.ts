@@ -218,4 +218,76 @@ async function* getAIAdviceStream(
     }
 }
 
-export { getAIAdvice, getAIAdviceStream };
+async function selectBestStocks(candidates: any[]): Promise<any[]> {
+    const prompt = `你是一名资深 A 股基金经理。我为你提供了 ${candidates.length} 只当前市场热门股票的技术面数据。请从量价配合、趋势形态、指标共振等角度，精选出最值得关注的 **Top 15** 股票。
+
+【候选股票池 (JSON 数据)】:
+${JSON.stringify(candidates.map(c => ({
+    n: c.name,
+    c: c.code,
+    p: c.price,
+    chg: c.changePercent + '%',
+    ind: c.indicators // 包含 rsi, macd_diff, ma5, ma20, vol_ratio, trend
+})), null, 0)}
+
+【评分规则 (Scoring Rules)】:
+请根据以下维度拉开差距 (60-99分)：
+1. **90-99分 (极强)**: MA5金叉且多头排列 + 量比>1.5 + MACD红柱扩大 + 热门板块龙头。
+2. **80-89分 (强势)**: 趋势向上但量能未明显放大，或处于回调支撑位。
+3. **70-79分 (关注)**: 底部启动初期，指标刚修复，风险收益比适中。
+4. **60-69分 (观察)**: 趋势未明朗或存在顶背离风险。
+
+【筛选标准】:
+1. **多头排列**: 优先选择 MA5 > MA20 且处于上升通道的股票 (trend='UP')。
+2. **资金动能**: 优先选择量比 (vol_ratio) > 1 且 MACD 柱值 (macd_hist) 翻红或扩大的标的。
+3. **超买超卖**: 避免 RSI > 85 的极端高位股，优选 RSI 在 50-70 强势区的股票。
+
+【输出要求】:
+1. 必须返回 **严格的 JSON 数组**。
+2. 必须包含 **正好 15 个** 对象，不要少于 15 个。
+3. 不要包含 markdown 格式，不要包含其他废话。
+
+数组格式如下：
+[
+  { 
+    "code": "股票代码", 
+    "name": "股票名称", 
+    "score": 88, 
+    "reason": "精炼的一句话点评（10字以内）", 
+    "deepReason": "深度入选逻辑（120-150字）。请结合当前技术面形态，从量价结构（如放量突破）、均线系统（如多头排列）、指标状态（MACD/RSI/布林带）及主力资金动向等多维度进行详细剖析，并尝试指出关键的支撑位或压力位。" 
+  },
+  ...
+]
+`;
+
+    try {
+        const completion: any = await client.chat.completions.create({
+            model: GlmModel,
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            response_format: { type: "json_object" } // GLM-4 Flash 支持 JSON Mode
+        });
+        
+        const content = completion.choices[0].message.content;
+        // 尝试解析 JSON
+        let result = [];
+        try {
+           const json = JSON.parse(content);
+           result = json.results || json.data || json; // 兼容可能的包装结构
+           if (!Array.isArray(result)) {
+               // 如果 LLM 直接返回数组
+               if (Array.isArray(json)) result = json;
+           }
+        } catch (e) {
+           console.error("AI 选股 JSON 解析失败", content);
+           return [];
+        }
+
+        return result.slice(0, 15);
+    } catch (err: any) {
+        console.error("AI 选股请求失败:", err);
+        return [];
+    }
+}
+
+export { getAIAdvice, getAIAdviceStream, selectBestStocks };

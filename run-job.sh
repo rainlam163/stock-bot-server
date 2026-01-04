@@ -14,6 +14,6 @@ echo "[$(date)] Starting Scheduled Selection Job..." >> cron.log
 # 执行 Worker 脚本
 # 这一步需要我们在 package.json 里加一个命令来直接运行 runSelectionJob
 # 或者我们直接用 node 执行编译后的文件
-node dist/run-worker.js >> cron.log 2>&1
+node ./run-worker.js >> cron.log 2>&1
 
 echo "[$(date)] Job Finished." >> cron.log

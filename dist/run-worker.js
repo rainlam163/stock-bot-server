@@ -1,3 +1,4 @@
+// @ts-ignore
 import { runSelectionJob } from './dist/src/worker.js';
 // 立即执行任务
 runSelectionJob()

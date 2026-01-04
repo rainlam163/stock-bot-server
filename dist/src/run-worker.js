@@ -1,0 +1,11 @@
+import { runSelectionJob } from './worker.js';
+// 立即执行任务
+runSelectionJob()
+    .then((res) => {
+    console.log('Worker execution result:', res);
+    process.exit(res.success ? 0 : 1);
+})
+    .catch((err) => {
+    console.error('Worker execution fatal error:', err);
+    process.exit(1);
+});

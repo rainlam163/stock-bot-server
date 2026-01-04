@@ -66,44 +66,62 @@ async function fetchHistory(symbol, isIndex = false, recentMonths = 3) {
     }
 }
 /**
- * 获取热门/涨幅榜股票 (筛选A股主板)
- * @param {number} limit 获取数量
+ * 获取全市场股票列表 (用于选股 Discovery 阶段)
+ * @returns {Promise<Array>} 股票基础信息列表
  */
-async function fetchHotStocks(limit = 20) {
+async function fetchAllStocks() {
     const url = 'https://push2.eastmoney.com/api/qt/clist/get';
+    const pageSize = 100; // 安全的页容量
+    let page = 1;
+    let allStocks = [];
     try {
-        const response = await axios.get(url, {
-            params: {
-                pn: '1', // 页码
-                pz: limit, // 每页数量
-                po: '1', // 排序方向：1倒序
-                np: '1',
-                ut: 'bd1d9ddb04089700cf9c27f6f7426281',
-                fltt: '2',
-                invt: '2',
-                wbp2u: '|0|0|0|web',
-                fid: 'f3', // 排序字段：f3涨跌幅
-                fs: 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23', // 筛选板块：沪深A股主板 (大概范围)
-                fields: 'f12,f14,f2,f3,f10,f8', // f12代码, f14名称, f2最新价, f3涨幅, f10量比, f8换手率
-                _: Date.now()
-            },
-            headers: { 'Referer': 'https://quote.eastmoney.com/' }
-        });
-        const list = response.data?.data?.diff;
-        if (!list)
-            return [];
-        return list.map((item) => ({
-            code: item.f12,
-            name: item.f14,
-            price: item.f2,
-            changePercent: item.f3,
-            volumeRatio: item.f10,
-            turnoverRate: item.f8
-        }));
+        while (true) {
+            const response = await axios.get(url, {
+                params: {
+                    pn: page.toString(),
+                    pz: pageSize.toString(),
+                    po: '1',
+                    np: '1',
+                    ut: 'bd1d9ddb04089700cf9c27f6f7426281',
+                    fltt: '2',
+                    invt: '2',
+                    wbp2u: '|0|0|0|web',
+                    fid: 'f3',
+                    fs: 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23',
+                    // f12:代码, f14:名称, f2:现价, f3:涨幅, f20:总市值, f26:上市日期
+                    fields: 'f12,f14,f2,f3,f20,f26',
+                    _: Date.now()
+                },
+                headers: { 'Referer': 'https://quote.eastmoney.com/' }
+            });
+            const data = response.data?.data;
+            if (!data || !data.diff || data.diff.length === 0) {
+                break; // 没有更多数据了
+            }
+            const list = data.diff.map((item) => ({
+                code: item.f12,
+                name: item.f14,
+                price: item.f2,
+                changePercent: item.f3,
+                marketCap: item.f20,
+                listingDate: item.f26
+            }));
+            allStocks = allStocks.concat(list);
+            // 如果返回数量小于页容量，说明是最后一页
+            if (data.diff.length < pageSize) {
+                break;
+            }
+            page++;
+            // 安全限制：防止死循环，最多抓取 100 页 (100 * 100 = 10000 只)
+            if (page > 100)
+                break;
+        }
+        console.log(`全市场扫描完成: 共获取 ${allStocks.length} 只股票`);
+        return allStocks;
     }
     catch (err) {
-        console.error('获取热门股票失败:', err.message);
-        return [];
+        console.error('获取全市场股票失败:', err.message);
+        return allStocks; // 返回已获取的部分
     }
 }
-export { fetchHistory, fetchHotStocks };
+export { fetchHistory, fetchAllStocks };

@@ -1,6 +1,7 @@
 import { OpenAI } from 'openai';
 import TI from 'technicalindicators';
-const GlmModel = 'glm-4-flash';
+const GlmModelDefault = 'glm-4-flash';
+const GlmModelDeep = 'glm-4.5-flash';
 const client = new OpenAI({
     apiKey: 'e08d19b7535344a19b07a4c842ad03f7.kv4mN181BrQcHqDg',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/'
@@ -110,11 +111,12 @@ ${indexRecent.map(d => d.close).join(', ')}
 请在回复时，段落之间务必保留一个完整的空行。
 `;
 }
-async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
+async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo, isDeep = false) {
     const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+    const model = isDeep ? GlmModelDeep : GlmModelDefault;
     try {
         const completion = await client.chat.completions.create({
-            model: GlmModel,
+            model: model,
             messages: [{ role: "user", content: prompt }],
             temperature: 0.1,
         });
@@ -124,11 +126,12 @@ async function getAIAdvice(symbol, stockName, stockHistory, indexHistory, newsLi
         return `AI 深度因子分析出错: ${err.message}`;
     }
 }
-async function* getAIAdviceStream(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo) {
+async function* getAIAdviceStream(symbol, stockName, stockHistory, indexHistory, newsList = [], holdingInfo, isDeep = false) {
     const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+    const model = isDeep ? GlmModelDeep : GlmModelDefault;
     try {
         const stream = await client.chat.completions.create({
-            model: GlmModel,
+            model: model,
             messages: [{ role: "user", content: prompt }],
             temperature: 0.1,
             stream: true,

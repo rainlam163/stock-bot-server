@@ -94,7 +94,7 @@ async function analyzeBatchStocks(candidates: any[]) {
  * @param {HoldingInfo} holdingInfo 持仓信息（可选）
  * @returns {Promise<Object>} 分析结果 { code, name, advice, error }
  */
-async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo): Promise<object> {
+async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo, isDeep: boolean = false): Promise<object> {
     try {
         // 并行抓取：K线数据 + 舆情新闻
         const [stockHistory, newsList] = await Promise.all([
@@ -123,7 +123,7 @@ async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?
         const formattedStockHistory = toOHLCV(stockHistory.klines);
         const formattedIndexHistory = toOHLCV(indexHistory || []);
 
-        const advice = await getAIAdvice(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo);
+        const advice = await getAIAdvice(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo, isDeep);
         
         return { 
             code, 
@@ -139,7 +139,7 @@ async function analyzeStock(code: string, indexHistory: Array<any>, holdingInfo?
     }
 }
 
-async function* analyzeStockStream(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo): AsyncGenerator<string, void, unknown> {
+async function* analyzeStockStream(code: string, indexHistory: Array<any>, holdingInfo?: HoldingInfo, isDeep: boolean = false): AsyncGenerator<string, void, unknown> {
     try {
         // 并行抓取：K线数据 + 舆情新闻
         const [stockHistory, newsList] = await Promise.all([
@@ -175,7 +175,7 @@ async function* analyzeStockStream(code: string, indexHistory: Array<any>, holdi
         }) + "\n";
 
         // Stream AI advice
-        const stream = getAIAdviceStream(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo);
+        const stream = getAIAdviceStream(code, stockHistory.name, formattedStockHistory, formattedIndexHistory, newsList, holdingInfo, isDeep);
         
         for await (const chunk of stream) {
             yield JSON.stringify({ type: 'chunk', data: chunk }) + "\n";

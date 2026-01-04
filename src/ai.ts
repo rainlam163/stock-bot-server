@@ -1,7 +1,8 @@
 import { OpenAI } from 'openai';
 import TI from 'technicalindicators';
 
-const GlmModel = 'glm-4-flash';
+const GlmModelDefault = 'glm-4-flash';
+const GlmModelDeep = 'glm-4.5-flash';
 
 const client = new OpenAI({
     apiKey: 'e08d19b7535344a19b07a4c842ad03f7.kv4mN181BrQcHqDg',
@@ -173,13 +174,15 @@ async function getAIAdvice(
     stockHistory: OHLCV[],
     indexHistory: OHLCV[],
     newsList: NewsItem[] = [],
-    holdingInfo?: HoldingInfo
+    holdingInfo?: HoldingInfo,
+    isDeep: boolean = false
 ): Promise<string> {
     const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+    const model = isDeep ? GlmModelDeep : GlmModelDefault;
 
     try {
         const completion: any = await client.chat.completions.create({
-            model: GlmModel,
+            model: model,
             messages: [{ role: "user", content: prompt }],
             temperature: 0.1,
         });
@@ -195,13 +198,15 @@ async function* getAIAdviceStream(
     stockHistory: OHLCV[],
     indexHistory: OHLCV[],
     newsList: NewsItem[] = [],
-    holdingInfo?: HoldingInfo
+    holdingInfo?: HoldingInfo,
+    isDeep: boolean = false
 ): AsyncGenerator<string, void, unknown> {
     const prompt = buildAnalysisPrompt(symbol, stockName, stockHistory, indexHistory, newsList, holdingInfo);
+    const model = isDeep ? GlmModelDeep : GlmModelDefault;
 
     try {
         const stream = await client.chat.completions.create({
-            model: GlmModel,
+            model: model,
             messages: [{ role: "user", content: prompt }],
             temperature: 0.1,
             stream: true,

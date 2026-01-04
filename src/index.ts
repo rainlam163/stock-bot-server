@@ -54,6 +54,7 @@ app.post('/api/analyze', async (c) => {
     const body = await c.req.json();
     const code = body.code;
     const holdingInfo = body.holdingInfo;
+    const isDeep = !!body.isDeep;
 
     if (!code || typeof code !== 'string') {
       return c.json({ error: '请提供有效的股票代码 (code)' }, 400);
@@ -94,7 +95,7 @@ app.post('/api/analyze', async (c) => {
         }
       }) + "\n");
 
-      const stockStream = analyzeStockStream(code, indexHistory, holdingInfo);
+      const stockStream = analyzeStockStream(code, indexHistory, holdingInfo, isDeep);
       
       for await (const chunk of stockStream) {
         await stream.write(chunk);

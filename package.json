@@ -12,6 +12,7 @@
     "axios": "^1.13.2",
     "better-sqlite3": "^12.5.0",
     "hono": "^4.11.1",
+    "node-cron": "^4.2.1",
     "openai": "^6.15.0",
     "p-limit": "^7.2.0",
     "technicalindicators": "^3.1.0"

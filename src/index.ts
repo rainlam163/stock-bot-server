@@ -1,8 +1,9 @@
 import { Hono } from 'hono'
 import { streamText } from 'hono/streaming'
 import { getMarketContext, analyzeStockStream } from './analyzer.js'
-import { getRecommendations } from './db.js'
+import { getRecommendations, getSectorPredictions } from './db.js'
 import { runSelectionJob } from './worker.js'
+import { runSectorPredictionJob } from './sector-worker.js'
 
 const app = new Hono()
 
@@ -35,6 +36,23 @@ app.get('/api/recommend', async (c) => {
     console.error('Recommend API Error:', err);
     return c.json({ error: '获取推荐失败' }, 500);
   }
+});
+
+// 行业指数推荐接口
+app.get('/api/sector-predictions', async (c) => {
+  try {
+    const data = getSectorPredictions();
+    return c.json(data);
+  } catch (err: any) {
+    console.error('Sector API Error:', err);
+    return c.json({ error: '获取行业预测失败' }, 500);
+  }
+});
+
+// 手动触发行业推荐任务
+app.post('/api/trigger-sector-selection', async (c) => {
+    const result = await runSectorPredictionJob();
+    return c.json(result);
 });
 
 // 手动触发选股任务 (Admin Only)

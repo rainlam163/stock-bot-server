@@ -147,4 +147,133 @@ async function* getAIAdviceStream(symbol, stockName, stockHistory, indexHistory,
         yield `AI 深度因子分析出错: ${err.message}`;
     }
 }
-export { getAIAdvice, getAIAdviceStream };
+async function selectBestStocks(candidates) {
+    const prompt = `你是一名专业的股票分析师，请根据以下候选股票的量化数据，结合市场情绪，选出未来3-5个交易日内最具上涨潜力的 **Top 20** 股票。
+
+【候选股票数据】:
+${JSON.stringify(candidates)}
+
+【分析要求】:
+1. 综合考虑量价关系、技术指标（如MACD、RSI、布林线）、资金流向和市场热点。
+2. 排除已经处于高位、有回调风险的股票。
+3. 优先选择处于启动初期、有放量迹象、技术形态良好的股票。
+4. 考虑行业轮动和板块效应。
+
+【输出要求】:
+请**仅**返回一个标准的 JSON 数组。
+数组格式如下：
+[
+  {
+    "symbol": "股票代码",
+    "stock_name": "股票名称",
+    "score": 95,
+    "reason": "详细的选股理由，包含量价、技术面和基本面逻辑。",
+    "key_factors": "关键影响因子，如：放量突破 / 底部启动 / 政策利好"
+  },
+  ...
+]
+`;
+    try {
+        const completion = await client.chat.completions.create({
+            model: GlmModelDeep, // 使用 4.5 模型进行深度分析
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.2,
+            response_format: { type: "json_object" }
+        });
+        const content = completion.choices[0].message.content;
+        let result = [];
+        try {
+            const json = JSON.parse(content);
+            result = json.results || json.data || json;
+            if (!Array.isArray(result) && Array.isArray(json))
+                result = json;
+        }
+        catch (e) {
+            console.error("AI 选股 JSON 解析失败", content);
+            return [];
+        }
+        return result.slice(0, 20);
+    }
+    catch (err) {
+        console.error("AI 选股请求失败:", err);
+        return [];
+    }
+}
+async function predictSectors(globalData, sectorData, newsHeadlines) {
+    const prompt = `你是一名宏观策略分析师。请结合隔夜全球市场表现、昨日 A 股行业数据及最新财经舆情，预测下一个交易日表现最强劲的 **Top 5** 行业板块。
+
+【1. 全球市场环境 (Global)】:
+${JSON.stringify(globalData)}
+
+【2. 昨日 A 股板块详细数据 (Sector Data)】:
+${JSON.stringify(sectorData.slice(0, 30))}
+
+【3. 最新财经快讯 (Sentiment)】:
+${newsHeadlines.join('\n')}
+
+【评分规则】:
+请严格从以下 6 个维度对行业进行打分 (0-100分)：
+1. **景气度 (Prosperity)**: 行业基本面改善、长期价值和政策导向。
+2. **估值 (Valuation)**: 当前 PE 水平，越低安全性越高。
+3. **主力资金 (Inflow)**: 昨日资金净流入强度。
+4. **净利润增长率 (Growth)**: 基于行业预期及快讯表现。
+5. **拥挤度 (Crowding)**: 换手率及成交热度，越低情绪越健康。
+6. **趋势度 (Trend)**: 价格形态及上涨势头强弱。
+
+【输出要求】:
+请**仅**返回一个标准的 JSON 数组。
+数组格式如下：
+[
+  { 
+    "sector_name": "板块名称",
+    "sector_code": "板块代码",
+    "score": 综合得分,
+    "val_prosperity": 景气度得分,
+    "val_valuation": 估值得分,
+    "val_inflow": 主力资金得分,
+    "val_profit_growth": 利润增长得分,
+    "val_crowding": 拥挤度得分,
+    "val_trend": 趋势度得分,
+    "prediction_reason": "详细理由...",
+    "key_factors": "影响因子标签"
+  },
+  ...
+]
+`;
+    const getResultByModel = async (model) => {
+        const completion = await client.chat.completions.create({
+            model: GlmModelDeep, // 使用 4.5 模型进行宏观分析
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.2,
+            response_format: { type: "json_object" }
+        });
+        const content = completion.choices[0].message.content;
+        let result = [];
+        try {
+            const json = JSON.parse(content);
+            result = json.results || json.data || json;
+            if (!Array.isArray(result) && Array.isArray(json))
+                result = json;
+        }
+        catch (e) {
+            console.error("AI 行业预测 JSON 解析失败", content);
+            return [];
+        }
+        return result.slice(0, 5);
+    };
+    try {
+        return await getResultByModel(GlmModelDeep);
+    }
+    catch (err) {
+        console.error("glm-4.5-flash AI 行业预测请求失败:", err);
+        console.log("尝试降级使用 glm-4-flash 模型...");
+        try {
+            return await getResultByModel(GlmModelDefault);
+        }
+        catch (err2) {
+            console.error("glm-4-flash AI 行业预测请求失败:", err2);
+            return [];
+        }
+    }
+}
+export { getAIAdvice, getAIAdviceStream, selectBestStocks, predictSectors };
